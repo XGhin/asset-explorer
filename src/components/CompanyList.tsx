@@ -1,3 +1,4 @@
+// CompanyList component - displays root folders (companies)
 import { useMemo } from 'react';
 import { Building2 } from 'lucide-react';
 import { usePatrimonyStore, getRootFolders } from '@/store/patrimonyStore';
