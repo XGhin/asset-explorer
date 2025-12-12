@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { usePatrimonyStore } from '@/store/patrimonyStore';
+import { useState, useMemo } from 'react';
+import { usePatrimonyStore, getSelectedFolder, getTotalExpenses, getFolderExpenses } from '@/store/patrimonyStore';
 import { Breadcrumb } from '@/components/Breadcrumb';
 import { ExpenseList } from '@/components/ExpenseList';
 import { CreateDialogs } from '@/components/CreateDialogs';
@@ -23,15 +23,24 @@ const formatCurrency = (value: number) => {
 
 export function DetailsPanel() {
   const selectedFolderId = usePatrimonyStore((s) => s.selectedFolderId);
-  const getSelectedFolder = usePatrimonyStore((s) => s.getSelectedFolder);
-  const getTotalExpenses = usePatrimonyStore((s) => s.getTotalExpenses);
-  const getFolderExpenses = usePatrimonyStore((s) => s.getFolderExpenses);
+  const folders = usePatrimonyStore((s) => s.folders);
+  const expenses = usePatrimonyStore((s) => s.expenses);
 
   const [openDialog, setOpenDialog] = useState<'folder' | 'item' | 'expense' | null>(null);
   const [showTotal, setShowTotal] = useState(false);
   const [showExpenses, setShowExpenses] = useState(false);
 
-  const selectedFolder = getSelectedFolder();
+  const selectedFolder = useMemo(() => getSelectedFolder(folders, selectedFolderId), [folders, selectedFolderId]);
+  
+  const total = useMemo(() => {
+    if (!selectedFolderId) return 0;
+    return getTotalExpenses(folders, expenses, selectedFolderId);
+  }, [folders, expenses, selectedFolderId]);
+  
+  const folderExpenses = useMemo(() => {
+    if (!selectedFolderId) return [];
+    return getFolderExpenses(folders, expenses, selectedFolderId, true);
+  }, [folders, expenses, selectedFolderId]);
 
   if (!selectedFolder) {
     return (
@@ -48,9 +57,6 @@ export function DetailsPanel() {
       </div>
     );
   }
-
-  const total = getTotalExpenses(selectedFolder.id);
-  const expenses = getFolderExpenses(selectedFolder.id, true);
 
   const getIcon = () => {
     if (selectedFolder.type === 'item') {
@@ -143,7 +149,7 @@ export function DetailsPanel() {
                 {formatCurrency(total)}
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                Inclui {expenses.length} despesa{expenses.length !== 1 ? 's' : ''} (todas as subpastas)
+                Inclui {folderExpenses.length} despesa{folderExpenses.length !== 1 ? 's' : ''} (todas as subpastas)
               </p>
             </div>
           </div>
@@ -153,13 +159,13 @@ export function DetailsPanel() {
           <div className="animate-fade-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-foreground">
-                Despesas ({expenses.length})
+                Despesas ({folderExpenses.length})
               </h3>
               <p className="text-sm text-muted-foreground">
                 Total: <span className="text-foreground font-medium">{formatCurrency(total)}</span>
               </p>
             </div>
-            <ExpenseList expenses={expenses} />
+            <ExpenseList expenses={folderExpenses} />
           </div>
         )}
 

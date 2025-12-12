@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { usePatrimonyStore } from '@/store/patrimonyStore';
+import { usePatrimonyStore, getSelectedFolder } from '@/store/patrimonyStore';
 import { EXPENSE_CATEGORIES } from '@/types/patrimony';
 import { FolderPlus, Package, Receipt } from 'lucide-react';
 
@@ -16,9 +16,11 @@ interface CreateDialogsProps {
 
 export function CreateDialogs({ openDialog, onClose }: CreateDialogsProps) {
   const selectedFolderId = usePatrimonyStore((s) => s.selectedFolderId);
+  const folders = usePatrimonyStore((s) => s.folders);
   const addFolder = usePatrimonyStore((s) => s.addFolder);
   const addExpense = usePatrimonyStore((s) => s.addExpense);
-  const getSelectedFolder = usePatrimonyStore((s) => s.getSelectedFolder);
+
+  const selectedFolder = useMemo(() => getSelectedFolder(folders, selectedFolderId), [folders, selectedFolderId]);
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState<string>('');
@@ -63,8 +65,6 @@ export function CreateDialogs({ openDialog, onClose }: CreateDialogsProps) {
       onClose();
     }
   };
-
-  const selectedFolder = getSelectedFolder();
 
   return (
     <>

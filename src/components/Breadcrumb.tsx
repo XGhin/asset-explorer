@@ -1,15 +1,19 @@
-import { usePatrimonyStore } from '@/store/patrimonyStore';
+import { useMemo } from 'react';
+import { usePatrimonyStore, getPath } from '@/store/patrimonyStore';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function Breadcrumb() {
   const selectedFolderId = usePatrimonyStore((s) => s.selectedFolderId);
-  const getPath = usePatrimonyStore((s) => s.getPath);
+  const folders = usePatrimonyStore((s) => s.folders);
   const selectFolder = usePatrimonyStore((s) => s.selectFolder);
 
-  if (!selectedFolderId) return null;
+  const path = useMemo(() => {
+    if (!selectedFolderId) return [];
+    return getPath(folders, selectedFolderId);
+  }, [folders, selectedFolderId]);
 
-  const path = getPath(selectedFolderId);
+  if (!selectedFolderId) return null;
 
   return (
     <nav className="flex items-center gap-1 text-sm overflow-x-auto">
