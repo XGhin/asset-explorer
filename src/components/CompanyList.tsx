@@ -1,12 +1,15 @@
+import { useMemo } from 'react';
 import { Building2 } from 'lucide-react';
-import { usePatrimonyStore } from '@/store/patrimonyStore';
+import { usePatrimonyStore, getRootFolders } from '@/store/patrimonyStore';
 import { cn } from '@/lib/utils';
 
 export function CompanyList() {
-  const rootFolders = usePatrimonyStore((s) => s.getRootFolders());
+  const folders = usePatrimonyStore((s) => s.folders);
   const selectedFolderId = usePatrimonyStore((s) => s.selectedFolderId);
   const selectFolder = usePatrimonyStore((s) => s.selectFolder);
   const toggleExpand = usePatrimonyStore((s) => s.toggleExpand);
+
+  const rootFolders = useMemo(() => getRootFolders(folders), [folders]);
 
   const handleSelect = (id: string) => {
     selectFolder(id);

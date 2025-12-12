@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, Package, FileText } from 'lucide-react';
-import { usePatrimonyStore } from '@/store/patrimonyStore';
+import { usePatrimonyStore, buildTree } from '@/store/patrimonyStore';
 import { TreeNode } from '@/types/patrimony';
 import { cn } from '@/lib/utils';
 
@@ -15,7 +16,7 @@ function TreeItem({ node, level }: TreeItemProps) {
   const toggleExpand = usePatrimonyStore((s) => s.toggleExpand);
 
   const isSelected = selectedFolderId === node.id;
-  const isExpanded = expandedIds.has(node.id);
+  const isExpanded = expandedIds.includes(node.id);
   const hasChildren = node.children.length > 0;
 
   const handleClick = () => {
@@ -89,9 +90,12 @@ function TreeItem({ node, level }: TreeItemProps) {
 }
 
 export function FolderTree() {
-  const tree = usePatrimonyStore((s) => s.getTree());
+  const folders = usePatrimonyStore((s) => s.folders);
+  const expenses = usePatrimonyStore((s) => s.expenses);
   const expandAll = usePatrimonyStore((s) => s.expandAll);
   const collapseAll = usePatrimonyStore((s) => s.collapseAll);
+
+  const tree = useMemo(() => buildTree(folders, expenses, null), [folders, expenses]);
 
   return (
     <div className="h-full flex flex-col bg-card border-r border-border">

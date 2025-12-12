@@ -5,7 +5,7 @@ interface PatrimonyState {
   folders: FolderNode[];
   expenses: Expense[];
   selectedFolderId: string | null;
-  expandedIds: Set<string>;
+  expandedIds: string[];
   
   // Actions
   addFolder: (name: string, parentId: string | null, type: 'folder' | 'item') => void;
@@ -14,14 +14,6 @@ interface PatrimonyState {
   toggleExpand: (id: string) => void;
   expandAll: () => void;
   collapseAll: () => void;
-  
-  // Computed
-  getTree: () => TreeNode[];
-  getSelectedFolder: () => FolderNode | null;
-  getPath: (folderId: string) => PathSegment[];
-  getTotalExpenses: (folderId: string) => number;
-  getFolderExpenses: (folderId: string, recursive: boolean) => Array<Expense & { folderPath: string; itemName?: string }>;
-  getRootFolders: () => FolderNode[];
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -54,11 +46,11 @@ const initialExpenses: Expense[] = [
   { id: 'exp-5', folderId: 'pc-01-upgrades', category: 'Upgrades', value: 320.00, date: new Date('2024-09-12'), description: 'Upgrade de RAM para 32GB', createdAt: new Date() },
 ];
 
-export const usePatrimonyStore = create<PatrimonyState>()((set, get) => ({
+export const usePatrimonyStore = create<PatrimonyState>()((set) => ({
   folders: initialFolders,
   expenses: initialExpenses,
   selectedFolderId: null,
-  expandedIds: new Set<string>(['empresa-02', 'primeiro-andar', 'setor-financeiro', 'calc-01', 'segundo-andar', 'setor-ti', 'pc-01']),
+  expandedIds: ['empresa-02', 'primeiro-andar', 'setor-financeiro', 'calc-01', 'segundo-andar', 'setor-ti', 'pc-01'],
 
   addFolder: (name, parentId, type) => {
     const id = generateId();
@@ -72,10 +64,9 @@ export const usePatrimonyStore = create<PatrimonyState>()((set, get) => ({
 
     set((state) => {
       let newFolders = [...state.folders, newFolder];
-      let newExpenses = [...state.expenses];
-      let newExpandedIds = new Set(state.expandedIds);
+      let newExpandedIds = [...state.expandedIds];
 
-      // If it's an item, create auto subfolders and initial acquisition expense
+      // If it's an item, create auto subfolders
       if (type === 'item') {
         const subfolders: FolderNode[] = ITEM_SUBFOLDERS.map((subName) => ({
           id: generateId(),
@@ -86,18 +77,18 @@ export const usePatrimonyStore = create<PatrimonyState>()((set, get) => ({
           createdAt: new Date(),
         }));
         newFolders = [...newFolders, ...subfolders];
-        newExpandedIds.add(id);
+        if (!newExpandedIds.includes(id)) {
+          newExpandedIds.push(id);
+        }
       }
 
       // Expand parent when adding
-      if (parentId) {
-        newExpandedIds.add(parentId);
+      if (parentId && !newExpandedIds.includes(parentId)) {
+        newExpandedIds.push(parentId);
       }
 
-      return { folders: newFolders, expenses: newExpenses, expandedIds: newExpandedIds };
+      return { folders: newFolders, expandedIds: newExpandedIds };
     });
-
-    return id;
   },
 
   addExpense: (expenseData) => {
@@ -113,110 +104,101 @@ export const usePatrimonyStore = create<PatrimonyState>()((set, get) => ({
 
   toggleExpand: (id) => {
     set((state) => {
-      const newExpanded = new Set(state.expandedIds);
-      if (newExpanded.has(id)) {
-        newExpanded.delete(id);
-      } else {
-        newExpanded.add(id);
-      }
-      return { expandedIds: newExpanded };
+      const isExpanded = state.expandedIds.includes(id);
+      return {
+        expandedIds: isExpanded
+          ? state.expandedIds.filter((i) => i !== id)
+          : [...state.expandedIds, id],
+      };
     });
   },
 
   expandAll: () => {
     set((state) => ({
-      expandedIds: new Set(state.folders.map((f) => f.id)),
+      expandedIds: state.folders.map((f) => f.id),
     }));
   },
 
-  collapseAll: () => set({ expandedIds: new Set() }),
-
-  getTree: () => {
-    const { folders, expenses } = get();
-    
-    const buildTree = (parentId: string | null): TreeNode[] => {
-      return folders
-        .filter((f) => f.parentId === parentId)
-        .map((folder) => ({
-          ...folder,
-          children: buildTree(folder.id),
-          expenses: expenses.filter((e) => e.folderId === folder.id),
-        }))
-        .sort((a, b) => {
-          // Items come after folders
-          if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        });
-    };
-
-    return buildTree(null);
-  },
-
-  getSelectedFolder: () => {
-    const { folders, selectedFolderId } = get();
-    return folders.find((f) => f.id === selectedFolderId) || null;
-  },
-
-  getPath: (folderId) => {
-    const { folders } = get();
-    const path: PathSegment[] = [];
-    let currentId: string | null = folderId;
-
-    while (currentId) {
-      const folder = folders.find((f) => f.id === currentId);
-      if (folder) {
-        path.unshift({ id: folder.id, name: folder.name });
-        currentId = folder.parentId;
-      } else {
-        break;
-      }
-    }
-
-    return path;
-  },
-
-  getTotalExpenses: (folderId) => {
-    const { folders, expenses } = get();
-    
-    const getAllDescendantIds = (id: string): string[] => {
-      const children = folders.filter((f) => f.parentId === id);
-      return [id, ...children.flatMap((c) => getAllDescendantIds(c.id))];
-    };
-
-    const allIds = getAllDescendantIds(folderId);
-    return expenses
-      .filter((e) => allIds.includes(e.folderId))
-      .reduce((sum, e) => sum + e.value, 0);
-  },
-
-  getFolderExpenses: (folderId, recursive) => {
-    const { folders, expenses } = get();
-    const getPath = get().getPath;
-    
-    const getAllDescendantIds = (id: string): string[] => {
-      const children = folders.filter((f) => f.parentId === id);
-      return [id, ...children.flatMap((c) => getAllDescendantIds(c.id))];
-    };
-
-    const targetIds = recursive ? getAllDescendantIds(folderId) : [folderId];
-    
-    return expenses
-      .filter((e) => targetIds.includes(e.folderId))
-      .map((e) => {
-        const path = getPath(e.folderId);
-        const folder = folders.find((f) => f.id === e.folderId);
-        const parent = folder?.parentId ? folders.find((f) => f.id === folder.parentId) : null;
-        
-        return {
-          ...e,
-          folderPath: path.map((p) => p.name).join(' > '),
-          itemName: parent?.type === 'item' ? parent.name : folder?.type === 'item' ? folder.name : undefined,
-        };
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-
-  getRootFolders: () => {
-    return get().folders.filter((f) => f.parentId === null);
-  },
+  collapseAll: () => set({ expandedIds: [] }),
 }));
+
+// Helper functions (not selectors, used in components)
+export function getRootFolders(folders: FolderNode[]): FolderNode[] {
+  return folders.filter((f) => f.parentId === null);
+}
+
+export function getSelectedFolder(folders: FolderNode[], selectedFolderId: string | null): FolderNode | null {
+  return folders.find((f) => f.id === selectedFolderId) || null;
+}
+
+export function getPath(folders: FolderNode[], folderId: string): PathSegment[] {
+  const path: PathSegment[] = [];
+  let currentId: string | null = folderId;
+
+  while (currentId) {
+    const folder = folders.find((f) => f.id === currentId);
+    if (folder) {
+      path.unshift({ id: folder.id, name: folder.name });
+      currentId = folder.parentId;
+    } else {
+      break;
+    }
+  }
+
+  return path;
+}
+
+export function buildTree(folders: FolderNode[], expenses: Expense[], parentId: string | null): TreeNode[] {
+  return folders
+    .filter((f) => f.parentId === parentId)
+    .map((folder) => ({
+      ...folder,
+      children: buildTree(folders, expenses, folder.id),
+      expenses: expenses.filter((e) => e.folderId === folder.id),
+    }))
+    .sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+export function getTotalExpenses(folders: FolderNode[], expenses: Expense[], folderId: string): number {
+  const getAllDescendantIds = (id: string): string[] => {
+    const children = folders.filter((f) => f.parentId === id);
+    return [id, ...children.flatMap((c) => getAllDescendantIds(c.id))];
+  };
+
+  const allIds = getAllDescendantIds(folderId);
+  return expenses
+    .filter((e) => allIds.includes(e.folderId))
+    .reduce((sum, e) => sum + e.value, 0);
+}
+
+export function getFolderExpenses(
+  folders: FolderNode[],
+  expenses: Expense[],
+  folderId: string,
+  recursive: boolean
+): Array<Expense & { folderPath: string; itemName?: string }> {
+  const getAllDescendantIds = (id: string): string[] => {
+    const children = folders.filter((f) => f.parentId === id);
+    return [id, ...children.flatMap((c) => getAllDescendantIds(c.id))];
+  };
+
+  const targetIds = recursive ? getAllDescendantIds(folderId) : [folderId];
+  
+  return expenses
+    .filter((e) => targetIds.includes(e.folderId))
+    .map((e) => {
+      const path = getPath(folders, e.folderId);
+      const folder = folders.find((f) => f.id === e.folderId);
+      const parent = folder?.parentId ? folders.find((f) => f.id === folder.parentId) : null;
+      
+      return {
+        ...e,
+        folderPath: path.map((p) => p.name).join(' > '),
+        itemName: parent?.type === 'item' ? parent.name : folder?.type === 'item' ? folder.name : undefined,
+      };
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
