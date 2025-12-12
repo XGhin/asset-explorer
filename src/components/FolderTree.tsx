@@ -1,3 +1,4 @@
+// FolderTree component - displays hierarchical folder structure
 import { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, Package, FileText } from 'lucide-react';
 import { usePatrimonyStore, buildTree } from '@/store/patrimonyStore';
